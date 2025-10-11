@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 import os
 
+import activation_function as af
+
 class NeuralNetwork:
 
     # ---------------------------
@@ -19,12 +21,15 @@ class NeuralNetwork:
     # ---------------------------
     # Initinal Function
     # ---------------------------
-    def __init__(self, input_size, hidden_layers_size, output_size, lr=0.025):
+    def __init__(self, input_size, hidden_layers_size, output_size, lr=0.025, decay=0.001, min_lr=0.0001, activation='relu'):
 
         self.input_size = input_size
         self.hidden_layers_size = hidden_layers_size
         self.output_size = output_size
         self.lr = lr
+        self.decay = decay
+        self.min_lr = min_lr
+        self.activation_name = activation
         
         self.total_layers = 1 + len(hidden_layers_size)
 
@@ -46,6 +51,9 @@ class NeuralNetwork:
     # ---------------------------
     def relu(self, x):
         return np.maximum(0, x)
+    
+    def leaky_relu(self, x, alpha=0.01):
+        return np.where(x > 0, x, alpha * x)
 
     def relu_deriv(self, x):
         return (x > 0).astype(float)
@@ -90,7 +98,11 @@ class NeuralNetwork:
 
         for i in range(self.total_layers):
             Z[i] = np.dot(self.W[i], (x if i == 0 else A[i-1])) + self.b[i]
-            A[i] = self.softmax(Z[i]) if i == self.total_layers - 1 else self.relu(Z[i])
+            if i == self.total_layers - 1:
+                A[i] = self.softmax(Z[i])
+            else:
+                activation_function = getattr(af, self.activation_name)
+                A[i] = activation_function(Z[i])
         
         return Z, A
 
@@ -107,7 +119,8 @@ class NeuralNetwork:
             if l == self.total_layers - 1:
                 dz[l] = A[l] - Y
             else:
-                dz[l] = np.dot(self.W[l+1].T, dz[l+1]) * self.relu_deriv(Z[l])
+                activation_deriv_func = getattr(af, f"{self.activation_name}_deriv")
+                dz[l] = np.dot(self.W[l+1].T, dz[l+1]) * activation_deriv_func(Z[l])
 
             # dW
             A_prev = X if l == 0 else A[l-1]
@@ -120,6 +133,9 @@ class NeuralNetwork:
         for l in reversed(range(self.total_layers)):
             self.W[l] -= self.lr * dW[l]
             self.b[l] -= self.lr * db[l]
+        
+        # Reduce learning rate
+        self.lr = max(self.min_lr, self.lr / (1 + self.decay))
 
     # ---------------------------
     # Training
@@ -172,8 +188,8 @@ class NeuralNetwork:
 # Main
 # ---------------------------
 if __name__ == "__main__":
-    nn = NeuralNetwork(784, [256, 128, 64], 5, 0.0075)
-    X_train, Y_train = nn.load_data(['data/train/0', 'data/train/1', 'data/train/2', 'data/train/3', 'data/train/4'])
+    nn = NeuralNetwork(input_size=784, hidden_layers_size=[256, 128, 64], output_size=10, lr=0.1, decay=0.0001, min_lr=0.0001, activation='relu')
+    X_train, Y_train = nn.load_data(['data/train/0', 'data/train/1', 'data/train/2', 'data/train/3', 'data/train/4', 'data/train/5', 'data/train/6', 'data/train/7', 'data/train/8', 'data/train/9'])
     print("X shape:", X_train.shape)   # sollte (2500, N)
     print("Y shape:", Y_train.shape)   # sollte (10, N)
     print("min/max X:", X_train.min(), X_train.max())
@@ -183,9 +199,9 @@ if __name__ == "__main__":
     
     nn.train(X_train, Y_train, epochs=35000)
 
-    nn.save("models/nn_number_detector_tiny_01234_0001.npz")
+    nn.save("models/nn_number_detector_large_test_0001.npz")
 
-    nn.load("models/nn_number_detector_tiny_01234_0001.npz")
+    nn.load("models/nn_number_detector_large_test_0001.npz")
 
     label, probs = nn.predict("data/train/0/0027.png")
     print(len(probs))
