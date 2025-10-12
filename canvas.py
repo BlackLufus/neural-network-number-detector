@@ -13,7 +13,7 @@ class DrawCanvas:
     text_output = ''
     nn = None
 
-    def __init__(self, nn_model_path = None, width:int=400, height:int=400, brush_size:int=20, save_size:int=28, output_folder:str='output'):
+    def __init__(self, nn_model_path = None, width:int=400, height:int=400, brush_size:int=20, save_size:int=28, output_folder:str='output', input_layer_size=784, hidden_layer_size=[128, 64], output_layer_size=10):
         self.WIDTH = width
         self.HEIGHT = height
         self.BRUSH_SIZE = brush_size
@@ -22,7 +22,7 @@ class DrawCanvas:
 
         # Init and load NN model
         if nn_model_path:
-            self.nn = NeuralNetwork(784, [256, 128, 64], 10)
+            self.nn = NeuralNetwork(input_layer_size, hidden_layer_size, output_layer_size)
             self.nn.load(nn_model_path)
 
     def __show_text(self, text):
@@ -110,6 +110,9 @@ class DrawCanvas:
                         if event.unicode.isdigit():
                             self.user_input = event.unicode
                             self.__show_text(f"INPUT: {event.unicode}")
+                        elif event.key == pygame.K_MINUS:
+                            self.user_input = '-'
+                            self.__show_text(f"INPUT: -")
                     
                     # CTRL pressed
                     if event.key == pygame.K_LCTRL:
@@ -144,6 +147,12 @@ class DrawCanvas:
         pygame.quit()
 
 if __name__ == "__main__":
-    # dc = DrawCanvas(output_folder="data/train")
-    dc = DrawCanvas("models/nn_number_detector_tiny_01234_0001.npz")
+    dc = DrawCanvas(output_folder="data/train")
+    # dc = DrawCanvas("models/nn_number_detector_tiny_01234_0001.npz")
+    # dc = DrawCanvas(
+    #     "models/nn_number_detector_large_0011.npz",
+    #     input_layer_size=784,
+    #     hidden_layer_size=[256, 128, 64],
+    #     output_layer_size=10
+    # )
     dc.build_and_run()
