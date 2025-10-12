@@ -5,6 +5,12 @@ import os
 
 import activation_function as af
 
+import os
+os.environ["OPENBLAS_NUM_THREADS"] = "32"
+os.environ["MKL_NUM_THREADS"] = "32"
+
+from concurrent.futures import ThreadPoolExecutor
+
 class NeuralNetwork:
 
     # ---------------------------
@@ -30,6 +36,9 @@ class NeuralNetwork:
         self.decay = decay
         self.min_lr = min_lr
         self.activation_name = activation
+
+        self.__activation_function = getattr(af, self.activation_name)
+        self.__activation_deriv_func = getattr(af, f"{self.activation_name}_deriv")
         
         self.total_layers = 1 + len(hidden_layers_size)
 
@@ -47,43 +56,23 @@ class NeuralNetwork:
         self.b[-1] = np.zeros((self.output_size, 1))
 
     # ---------------------------
-    # Help Functions
-    # ---------------------------
-    def relu(self, x):
-        return np.maximum(0, x)
-    
-    def leaky_relu(self, x, alpha=0.01):
-        return np.where(x > 0, x, alpha * x)
-
-    def relu_deriv(self, x):
-        return (x > 0).astype(float)
-
-    def softmax(self, x):
-        exp = np.exp(x - np.max(x))
-        return exp / np.sum(exp, axis=0, keepdims=True)
-
-    def cross_entropy(self, pred, target):
-        return -np.sum(target * np.log(pred + 1e-9))
-
-    # ---------------------------
     # Load Data
     # ---------------------------
     def load_data(self, folders=['data/train/0', 'data/train/1', 'data/train/2']):
         X, Y = [], []
         print(folders)
-        for folder in folders:
+        for index, folder in enumerate(folders):
             print(folder)
             for file in os.listdir(folder):
                 if file.endswith('png'):
-                    label = int(folder.split('/')[-1])
                     # print("file", "'", file, "'")
                     img = cv2.imread(folder + "/" + file, cv2.IMREAD_GRAYSCALE)
                     _, img = cv2.threshold(img, 128, 1, cv2.THRESH_BINARY)
-                    arr = img.reshape(-1, 1)
+                    arr = img.reshape(-1, 1).astype(np.float32)
                     # print("img")
                     # print(np.asarray(img))
                     one_hot = np.zeros((len(folders), 1))
-                    one_hot[label] = 1
+                    one_hot[index] = 1
                     X.append(arr)
                     Y.append(one_hot)
         return np.hstack(X), np.hstack(Y)
@@ -93,34 +82,32 @@ class NeuralNetwork:
     # ---------------------------
     def forward(self, x):
 
-        Z = [None] * self.total_layers
-        A = [None] * self.total_layers
+        Z = np.empty((self.total_layers,), dtype=object)
+        A = np.empty((self.total_layers,), dtype=object)
+
 
         for i in range(self.total_layers):
             Z[i] = np.dot(self.W[i], (x if i == 0 else A[i-1])) + self.b[i]
             if i == self.total_layers - 1:
-                A[i] = self.softmax(Z[i])
+                A[i] = af.softmax(Z[i])
             else:
-                activation_function = getattr(af, self.activation_name)
-                A[i] = activation_function(Z[i])
+                A[i] = self.__activation_function(Z[i])
         
         return Z, A
 
     def backward(self, X, Y, Z: list, A: list):
         m = X.shape[1]
 
-        # descent
-        dz = [None] * self.total_layers
-        dW = [None] * self.total_layers
-        db = [None] * self.total_layers
+        dz = np.empty((self.total_layers,), dtype=object)
+        dW = np.empty((self.total_layers,), dtype=object)
+        db = np.empty((self.total_layers,), dtype=object)
 
         for l in reversed(range(self.total_layers)):
             # dz
             if l == self.total_layers - 1:
                 dz[l] = A[l] - Y
             else:
-                activation_deriv_func = getattr(af, f"{self.activation_name}_deriv")
-                dz[l] = np.dot(self.W[l+1].T, dz[l+1]) * activation_deriv_func(Z[l])
+                dz[l] = np.dot(self.W[l+1].T, dz[l+1]) * self.__activation_deriv_func(Z[l])
 
             # dW
             A_prev = X if l == 0 else A[l-1]
@@ -140,17 +127,32 @@ class NeuralNetwork:
     # ---------------------------
     # Training
     # ---------------------------
-    def train(self, X, Y, epochs=5000):
+    def train(self, X, Y, epochs=5000, batch_size=32):
+
+        m = X.shape[1] # (n_features, n_examples)
+
         for epoch in range(epochs):
-            Z, A = self.forward(X)
-            loss = self.cross_entropy(A[-1], Y)
-            self.backward(X, Y, Z, A)
+            
+            # Shuffle the training examples randomly for this epoch
+            permutation = np.random.permutation(m)
+            X_shuffled = X[:, permutation]
+            Y_shuffled = Y[:, permutation]
+
+            # Process data in mini-batches
+            for i in range(0, m, batch_size):
+                X_batch = X_shuffled[:, i:i + batch_size]
+                Y_batch = Y_shuffled[:, i:i + batch_size]
+
+                Z, A = self.forward(X_batch)
+                self.backward(X_batch, Y_batch, Z, A)
             if epoch % 50 == 0:
-                preds = np.argmax(A[-1], axis=0)
+                _, A_full = self.forward(X)
+                loss_full = af.cross_entropy(A_full[-1], Y)
+                preds = np.argmax(A_full[-1], axis=0)
                 truth = np.argmax(Y, axis=0)
                 acc = np.mean(preds == truth) * 100
-                print(f"Epoche {epoch:4d}: Loss={loss:.4f}, Genauigkeit={acc:.2f}%")
-    
+                print(f"Epoche {epoch:4d}: Loss={loss_full:.4f}, Genauigkeit={acc:.2f}%")
+
     # ---------------------------
     # Predict
     # ---------------------------
@@ -188,20 +190,31 @@ class NeuralNetwork:
 # Main
 # ---------------------------
 if __name__ == "__main__":
-    nn = NeuralNetwork(input_size=784, hidden_layers_size=[256, 128, 64], output_size=10, lr=0.1, decay=0.0001, min_lr=0.0001, activation='relu')
-    X_train, Y_train = nn.load_data(['data/train/0', 'data/train/1', 'data/train/2', 'data/train/3', 'data/train/4', 'data/train/5', 'data/train/6', 'data/train/7', 'data/train/8', 'data/train/9'])
-    print("X shape:", X_train.shape)   # sollte (2500, N)
+    # nn = NeuralNetwork(input_size=784, hidden_layers_size=[256, 128, 64], output_size=10, lr=0.25, decay=0.00001, min_lr=0.0001, activation='relu')
+    # nn = NeuralNetwork(input_size=784, hidden_layers_size=[256, 128, 64], output_size=10, lr=0.1, decay=0.0001, min_lr=0.01, activation='relu')
+    nn = NeuralNetwork(
+        input_size=784,
+        hidden_layers_size=[256, 128, 64],
+        output_size=11,
+        lr=0.025,
+        decay=0.0001,
+        min_lr=0.01,
+        activation='relu'
+    )
+
+    X_train, Y_train = nn.load_data(['data/train/0', 'data/train/1', 'data/train/2', 'data/train/3', 'data/train/4', 'data/train/5', 'data/train/6', 'data/train/7', 'data/train/8', 'data/train/9', 'data/train/10'])
+    print("X shape:", X_train.shape)   # sollte (784, N)
     print("Y shape:", Y_train.shape)   # sollte (10, N)
     print("min/max X:", X_train.min(), X_train.max())
     print("unique labels count:", np.unique(np.argmax(Y_train, axis=0), return_counts=True))
     
-    # nn.load("models/nn_number_detector_tiny_0123_0001.npz")
+    # nn.load("models/nn_number_detector_large_0007.npz")
     
-    nn.train(X_train, Y_train, epochs=35000)
+    nn.train(X_train, Y_train, epochs=4000, batch_size=64)
 
-    nn.save("models/nn_number_detector_large_test_0001.npz")
+    nn.save("models/nn_number_detector_large_extra_0001.npz")
 
-    nn.load("models/nn_number_detector_large_test_0001.npz")
+    nn.load("models/nn_number_detector_large_extra_0001.npz")
 
     label, probs = nn.predict("data/train/0/0027.png")
     print(len(probs))

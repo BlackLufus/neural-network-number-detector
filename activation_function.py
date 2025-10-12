@@ -57,3 +57,11 @@ def elu_deriv(x, alpha=1.0):
     dx = np.ones_like(x)
     dx[x <= 0] = alpha * np.exp(x[x <= 0])
     return dx
+
+
+def softmax(x):
+        exp = np.exp(x - np.max(x))
+        return exp / np.sum(exp, axis=0, keepdims=True)
+
+def cross_entropy(pred, target):
+    return -np.sum(target * np.log(pred + 1e-9))
