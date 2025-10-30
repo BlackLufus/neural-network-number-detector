@@ -5,7 +5,7 @@ import pygame
 import os
 import cv2
 
-from neural_network import NeuralNetwork
+from neural_network_numpy import NeuralNetwork
 
 class DrawCanvas:
 
@@ -101,8 +101,7 @@ class DrawCanvas:
                         filepath = self.__save_image(None)
                         print(filepath)
                         label, probs = self.nn.predict(filepath)
-                        print(label)
-                        print(len(probs))
+                        print(probs)
                         self.__show_text(f"OUTPUT: {label} ({probs[label]:.5f})")
 
                 elif event.type == pygame.KEYDOWN:
@@ -150,9 +149,9 @@ if __name__ == "__main__":
     # dc = DrawCanvas(output_folder="data/train")
     # dc = DrawCanvas("models/nn_number_detector_tiny_01234_0001.npz")
     dc = DrawCanvas(
-        "models/nn_number_detector_pytorch_numpy_0002.npz",
+        "models/nn_number_detector_numpy_0004.npz",
         input_layer_size=784,
-        hidden_layer_size=[512, 256],
+        hidden_layer_size=[256, 256],
         output_layer_size=10
     )
     dc.build_and_run()
