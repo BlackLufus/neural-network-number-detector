@@ -150,9 +150,9 @@ if __name__ == "__main__":
     # dc = DrawCanvas(output_folder="data/train")
     # dc = DrawCanvas("models/nn_number_detector_tiny_01234_0001.npz")
     dc = DrawCanvas(
-        "models/nn_number_detector_0001.npz",
+        "models/nn_number_detector_pytorch_numpy_0002.npz",
         input_layer_size=784,
-        hidden_layer_size=[256, 256],
+        hidden_layer_size=[512, 256],
         output_layer_size=10
     )
     dc.build_and_run()
