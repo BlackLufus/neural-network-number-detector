@@ -60,8 +60,14 @@ def elu_deriv(x, alpha=1.0):
 
 
 def softmax(x):
-        exp = np.exp(x - np.max(x))
-        return exp / np.sum(exp, axis=0, keepdims=True)
+    exp = np.exp(x - np.max(x))
+    return exp / np.sum(exp, axis=0, keepdims=True)
+
+# def softmax(z):
+#     # Subtrahiere das Maximum in jeder Spalte
+#     z_max = np.max(z, axis=0, keepdims=True)
+#     exp = np.exp(z - z_max)
+#     return exp / np.sum(exp, axis=0, keepdims=True)
 
 def cross_entropy(pred, target):
     return -np.sum(target * np.log(pred + 1e-9))
