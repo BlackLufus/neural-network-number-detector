@@ -146,7 +146,7 @@ class DrawCanvas:
         pygame.quit()
 
 if __name__ == "__main__":
-    # dc = DrawCanvas(output_folder="data/train")
+    dc = DrawCanvas(output_folder="data/train")
     # dc = DrawCanvas("models/nn_number_detector_tiny_01234_0001.npz")
     dc = DrawCanvas(
         "models/nn_number_detector_numpy_0004.npz",

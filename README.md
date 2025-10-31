@@ -162,3 +162,11 @@ dc.build_and_run()
 ```
 
 You can save your input using the keyboard shortcuts `CTRL` + `S` and clear the canvas using `CTRL` + `C`.
+
+## 📥 Model download links
+
+You can try one of the following pre-trained models:
+
+> [nn_number_detector_pytorch_0004.npz](https://drive.google.com/file/d/1vCHmscmPRKydiFfoYqEEV7zyCoS5HdeB/view?usp=drive_link)
+
+> [nn_number_detector_numpy_0004.npz](https://drive.google.com/file/d/1BF-oo650ayLJjA4kI-mBhPWEBLD2wk1o/view?usp=drive_link)
