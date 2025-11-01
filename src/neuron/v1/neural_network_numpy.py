@@ -103,13 +103,17 @@ class NeuralNetwork:
     # Forward
     # ---------------------------
     def forward(self, x, training=False):
-        Z, A = [], []
+        # Calculation of layers plus bias
+        Z = []
 
-        current_input = x
+        # Applying of activation functions
+        A = []
+
+        current_activation = x
 
         for i in range(self.total_layers):
 
-            z = np.matmul(current_input, self.weights[i]) + self.bias[i]
+            z = np.dot(current_activation, self.weights[i]) + self.bias[i]
             Z.append(z)
 
             if i == self.total_layers - 1:
@@ -117,14 +121,20 @@ class NeuralNetwork:
             else:
                 a = af.relu(z)
 
-                # 👉 Dropout nur während Training:
+                # Apply dropout to hidden layers during the training mode and layer is not input layer
                 if training and self.dropout_rate > 0:
+                    # Create a random mask with values between 0 or 1
+                    # Each neuron is dropped (set to 0) with probability of dropout_rate
                     dropout_mask = (np.random.rand(*a.shape) > self.dropout_rate).astype(np.float32)
-                    a *= dropout_mask                     # "Ausschalten" zufälliger Neuronen
-                    a /= (1.0 - self.dropout_rate)           # Skalieren, damit Erwartungswert gleich bleibt
+                    # Multiply activations by the mask
+                    # This "turns off" (zeros out) the neurons that are dropped
+                    a *= dropout_mask
+                    # Scale remaining activations to keep the expected output the same
+                    # Prevents shrinking of activation values due to dropout
+                    a /= (1.0 - self.dropout_rate)
                     
             A.append(a)
-            current_input = a
+            current_activation = a
 
         return Z, A
 
@@ -143,14 +153,14 @@ class NeuralNetwork:
         for i in reversed(range(self.total_layers)):
             # dW
             A_prev = X if i == 0 else A[i-1]
-            dW[i] = (1/m) * np.matmul(A_prev.T, dz)
+            dW[i] = (1/m) * np.dot(A_prev.T, dz)
 
             # db
             db[i] = (1/m) * np.sum(dz, axis=0)
 
             # dz
             if i > 0:
-                dz = np.matmul(dz, self.weights[i].T) * af.relu_deriv(Z[i-1])
+                dz = np.dot(dz, self.weights[i].T) * af.relu_deriv(Z[i-1])
         
         # Update weights and biases
         for i in reversed(range(self.total_layers)):

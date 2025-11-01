@@ -122,13 +122,17 @@ class NeuralNetwork():
     # Forward
     # ---------------------------
     def forward(self, x, training=False):
-        Z, A = [], []
+        # Calculation of layers plus bias
+        Z = []
 
-        current_input = (x).to(self.device)
+        # Applying of activation functions
+        A = []
+
+        current_activation = (x).to(self.device)
 
         for i in range(self.total_layers):
 
-            z = torch.matmul(current_input, self.weights[i]) + self.bias[i]
+            z = torch.matmul(current_activation, self.weights[i]) + self.bias[i]
             Z.append(z)
 
             if i == self.total_layers - 1:
@@ -136,14 +140,20 @@ class NeuralNetwork():
             else:
                 a = torch.relu(z)
 
-                # 👉 Dropout nur während Training:
+                # Apply dropout to hidden layers during the training mode and layer is not input layer
                 if training and self.dropout_rate > 0:
+                    # Create a random mask with values between 0 or 1
+                    # Each neuron is dropped (set to 0) with probability of dropout_rate
                     dropout_mask = (torch.rand(*a.shape, device=a.device) > self.dropout_rate).float()
-                    a *= dropout_mask                     # "Ausschalten" zufälliger Neuronen
-                    a /= (1.0 - self.dropout_rate)           # Skalieren, damit Erwartungswert gleich bleibt
+                    # Multiply activations by the mask
+                    # This "turns off" (zeros out) the neurons that are dropped
+                    a *= dropout_mask
+                    # Scale remaining activations to keep the expected output the same
+                    # Prevents shrinking of activation values due to dropout
+                    a /= (1.0 - self.dropout_rate)
                     
             A.append(a)
-            current_input = a
+            current_activation = a
 
         return Z, A
 
